@@ -270,7 +270,7 @@
 
         // --- CONFIGURATION ---
         const CONFIG = {
-            imageCount: window.innerWidth < 768 ? 20 : 30,
+            imageCount: 19,
             sphereRadius: window.innerWidth < 768 ? 12 : 18,
             imageWidth: 3.2,
             imageHeight: 4.8, // 2:3 aspect ratio
@@ -372,10 +372,9 @@
             const phi = Math.PI * (3 - Math.sqrt(5));
 
             for (let i = 0; i < CONFIG.imageCount; i++) {
-                // Generate Placeholder URL (Picsum)
-                const seed = i + 10;
-                const url = `https://picsum.photos/seed/${seed}/400/600`;
-                
+                // فراخوانی عکس‌های واقعی خانوادگی
+                const url = `assets/photos/photo${String(i + 1).padStart(2, '0')}.jpg`;
+
                 const texture = textureLoader.load(url);
                 texture.colorSpace = THREE.SRGBColorSpace;
 
