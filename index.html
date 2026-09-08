@@ -143,45 +143,60 @@
 
         .modal-content {
             text-align: center;
-            transform: translateY(20px);
-            transition: transform 0.4s ease;
+            transform: scale(0.92);
+            transition: transform 0.4s cubic-bezier(.16,.9,.2,1);
+            max-width: 92vw;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.9rem;
         }
 
         #modal.active .modal-content {
-            transform: translateY(0);
+            transform: scale(1);
         }
 
-        .modal-content h2 {
-            font-size: 1.5rem;
-            font-weight: 300;
-            letter-spacing: 0.2em;
-            margin-bottom: 1rem;
+        .modal-content img {
+            max-width: 90vw;
+            max-height: 80vh;
+            width: auto;
+            height: auto;
+            display: block;
+            border-radius: 8px;
+            box-shadow: 0 20px 70px rgba(0, 0, 0, 0.6);
+            background: #111;
         }
 
-        .modal-content p {
-            font-size: 0.8rem;
-            color: #666;
-            letter-spacing: 0.1em;
-            margin-bottom: 2rem;
-        }
-
-        .close-btn {
-            background: transparent;
-            border: 1px solid #333;
-            color: #fff;
-            padding: 0.8rem 2rem;
-            font-size: 0.7rem;
-            letter-spacing: 0.2em;
+        .modal-caption {
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            color: #ccc;
             text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            pointer-events: all;
         }
 
-        .close-btn:hover {
+        .modal-close-btn {
+            position: fixed;
+            top: 22px;
+            left: 22px;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 1.1rem;
+            cursor: pointer;
+            z-index: 101;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.25s ease;
+        }
+
+        .modal-close-btn:hover {
             background: #fff;
             color: #000;
-            border-color: #fff;
         }
 
         /* --- FALLBACK --- */
@@ -249,10 +264,12 @@
 
     <!-- Click Modal -->
     <div id="modal">
+        <button class="modal-close-btn" onclick="closeModal()" aria-label="بستن">✕</button>
         <div class="modal-content">
-            <h2>PROJECT SELECTED</h2>
-            <p>This is a demo interaction. Real links will be added later.</p>
-            <button class="close-btn" onclick="closeModal()">Close</button>
+            <img id="modal-img" src="" alt="خاطره">
+            <div class="modal-caption">
+                <span id="modal-title"></span>
+            </div>
         </div>
     </div>
 
@@ -306,6 +323,8 @@
         const tooltipCategory = document.getElementById('tooltip-category');
         const tooltipYear = document.getElementById('tooltip-year');
         const modal = document.getElementById('modal');
+        const modalImg = document.getElementById('modal-img');
+        const modalTitle = document.getElementById('modal-title');
         const container = document.getElementById('canvas-container');
 
         // --- INITIALIZATION ---
@@ -424,9 +443,10 @@
                     targetPos: new THREE.Vector3(targetX, targetY, targetZ),
                     initialQuat: initialQuaternion,
                     targetQuat: targetQuaternion,
-                    title: `PROJECT ${String(i + 1).padStart(2, '0')}`,
-                    category: ['WEB DESIGN', 'ART DIRECTION', '3D MOTION', 'BRANDING'][Math.floor(Math.random() * 4)],
-                    year: '2026'
+                    title: `خاطره ${String(i + 1).padStart(2, '0')}`,
+                    category: 'خاطرات خانوادگی',
+                    year: '2026',
+                    imageUrl: url
                 };
 
                 // Set initial transform
@@ -627,6 +647,8 @@
 
         // --- MODAL ---
         window.openModal = function(data) {
+            modalImg.src = data.imageUrl;
+            modalTitle.textContent = data.title;
             modal.classList.add('active');
             // Pause inertia while modal is open
             velocity.x = 0;
