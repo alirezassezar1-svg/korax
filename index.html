@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Interactive 3D Image Orb | Demo</title>
+    <style>
+        /* --- RESET & BASE --- */
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #050505;
+            color: #ffffff;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+            width: 100vw;
+            /* Tall body to enable native scrolling */
+            height: 400vh; 
+        }
+
+        /* --- CANVAS CONTAINER --- */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+            outline: none;
+        }
+
+        /* --- UI OVERLAYS --- */
+        .ui-layer {
+            position: fixed;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass through to canvas */
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 2rem;
+        }
+
+        .ui-top {
+            text-align: center;
+            opacity: 0;
+            animation: fadeIn 2s ease-out 0.5s forwards;
+        }
+
+        .ui-bottom {
+            text-align: center;
+            opacity: 0;
+            animation: fadeIn 2s ease-out 1s forwards;
+        }
+
+        h1 {
+            font-size: 0.85rem;
+            font-weight: 400;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: #ffffff;
+            margin-bottom: 0.5rem;
+        }
+
+        p.subtitle {
+            font-size: 0.7rem;
+            font-weight: 300;
+            letter-spacing: 0.15em;
+            color: #666666;
+            text-transform: uppercase;
+        }
+
+        .divider {
+            width: 40px;
+            height: 1px;
+            background-color: #333;
+            margin: 1rem auto;
+        }
+
+        /* --- HOVER TOOLTIP --- */
+        #tooltip {
+            position: fixed;
+            z-index: 20;
+            pointer-events: none;
+            background: rgba(10, 10, 10, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem 1.5rem;
+            transform: translate(-50%, -150%);
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            text-align: left;
+        }
+
+        #tooltip.active {
+            opacity: 1;
+            transform: translate(-50%, -120%);
+        }
+
+        #tooltip h3 {
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            color: #fff;
+            margin-bottom: 0.25rem;
+        }
+
+        #tooltip span {
+            font-size: 0.65rem;
+            font-weight: 300;
+            letter-spacing: 0.05em;
+            color: #888;
+            display: block;
+        }
+
+        /* --- MODAL --- */
+        #modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+
+        #modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            text-align: center;
+            transform: translateY(20px);
+            transition: transform 0.4s ease;
+        }
+
+        #modal.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-content h2 {
+            font-size: 1.5rem;
+            font-weight: 300;
+            letter-spacing: 0.2em;
+            margin-bottom: 1rem;
+        }
+
+        .modal-content p {
+            font-size: 0.8rem;
+            color: #666;
+            letter-spacing: 0.1em;
+            margin-bottom: 2rem;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 0.8rem 2rem;
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            pointer-events: all;
+        }
+
+        .close-btn:hover {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+
+        /* --- FALLBACK --- */
+        #webgl-fallback {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 200;
+            background: #050505;
+            color: #666;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+            font-size: 0.9rem;
+            letter-spacing: 0.1em;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            body { height: 300vh; }
+            h1 { font-size: 0.75rem; }
+            .ui-layer { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- WebGL Fallback -->
+    <div id="webgl-fallback">
+        Your browser does not support WebGL.<br>Please use a modern browser to view this experience.
+    </div>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay -->
+    <div class="ui-layer">
+        <div class="ui-top">
+            <h1>Image Orb</h1>
+            <div class="divider"></div>
+            <p class="subtitle">[ Drag to Rotate ]</p>
+            <p class="subtitle" style="margin-top: 0.5rem;">[ Scroll to Transform ]</p>
+        </div>
+        <div class="ui-bottom">
+            <p class="subtitle" id="project-count">30 Projects</p>
+            <div class="divider"></div>
+            <p class="subtitle">Interactive WebGL Experiment</p>
+        </div>
+    </div>
+
+    <!-- Hover Tooltip -->
+    <div id="tooltip">
+        <h3 id="tooltip-title">PROJECT 01</h3>
+        <span id="tooltip-category">WEB DESIGN</span>
+        <span id="tooltip-year">2026</span>
+    </div>
+
+    <!-- Click Modal -->
+    <div id="modal">
+        <div class="modal-content">
+            <h2>PROJECT SELECTED</h2>
+            <p>This is a demo interaction. Real links will be added later.</p>
+            <button class="close-btn" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- CONFIGURATION ---
+        const CONFIG = {
+            imageCount: window.innerWidth < 768 ? 20 : 30,
+            sphereRadius: window.innerWidth < 768 ? 12 : 18,
+            imageWidth: 3.2,
+            imageHeight: 4.8, // 2:3 aspect ratio
+            scrollLerp: 0.06,
+            rotationLerp: 0.08,
+            dragSensitivity: 0.005,
+            inertiaDecay: 0.95
+        };
+
+        // --- STATE ---
+        let scene, camera, renderer;
+        let imageGroup;
+        let meshes = [];
+        let scrollProgress = 0;
+        let targetScrollProgress = 0;
+        
+        // Interaction State
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let targetRotation = { x: 0, y: 0 };
+        let currentRotation = { x: 0, y: 0 };
+        let velocity = { x: 0, y: 0 };
+        let isTouch = false;
+
+        // Raycaster
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+        let hoveredMesh = null;
+
+        // DOM Elements
+        const tooltip = document.getElementById('tooltip');
+        const tooltipTitle = document.getElementById('tooltip-title');
+        const tooltipCategory = document.getElementById('tooltip-category');
+        const tooltipYear = document.getElementById('tooltip-year');
+        const modal = document.getElementById('modal');
+        const container = document.getElementById('canvas-container');
+
+        // --- INITIALIZATION ---
+        function init() {
+            // Check WebGL support
+            try {
+                const testCanvas = document.createElement('canvas');
+                const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+                if (!gl) throw new Error('No WebGL');
+            } catch (e) {
+                document.getElementById('webgl-fallback').style.display = 'flex';
+                return;
+            }
+
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color('#050505');
+            // Add subtle fog for depth
+            scene.fog = new THREE.FogExp2('#050505', 0.015);
+
+            // Camera Setup
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 35;
+
+            // Renderer Setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            container.appendChild(renderer.domElement);
+
+            // Group to hold all images
+            imageGroup = new THREE.Group();
+            scene.add(imageGroup);
+
+            // Generate Images
+            generateImages();
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('scroll', onScroll);
+            
+            // Mouse Events
+            container.addEventListener('mousedown', onPointerDown);
+            window.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('mouseup', onPointerUp);
+            container.addEventListener('click', onClick);
+
+            // Touch Events
+            container.addEventListener('touchstart', onPointerDown, { passive: false });
+            window.addEventListener('touchmove', onPointerMove, { passive: false });
+            window.addEventListener('touchend', onPointerUp);
+
+            // Start Loop
+            animate();
+        }
+
+        // --- IMAGE GENERATION ---
+        function generateImages() {
+            const geometry = new THREE.PlaneGeometry(CONFIG.imageWidth, CONFIG.imageHeight);
+            const textureLoader = new THREE.TextureLoader();
+            
+            // Fibonacci Sphere Constants
+            const phi = Math.PI * (3 - Math.sqrt(5));
+
+            for (let i = 0; i < CONFIG.imageCount; i++) {
+                // Generate Placeholder URL (Picsum)
+                const seed = i + 10;
+                const url = `https://picsum.photos/seed/${seed}/400/600`;
+                
+                const texture = textureLoader.load(url);
+                texture.colorSpace = THREE.SRGBColorSpace;
+
+                // Material: Basic ensures consistent brightness, but we add a subtle border effect via a second mesh or shader. 
+                // For performance and simplicity, we use Basic with a slight transparent border trick or just clean planes.
+                const material = new THREE.MeshBasicMaterial({ 
+                    map: texture,
+                    side: THREE.DoubleSide
+                });
+
+                const mesh = new THREE.Mesh(geometry, material);
+
+                // 1. Initial State: Scattered Cloud (Flat-ish but with depth)
+                const scatterRadius = 25;
+                const initX = (Math.random() - 0.5) * scatterRadius * 1.5;
+                const initY = (Math.random() - 0.5) * scatterRadius;
+                const initZ = (Math.random() - 0.5) * 15 - 5; // Mostly in front of center
+                
+                // Random initial rotation for "floating" feel
+                const initRotX = (Math.random() - 0.5) * 0.5;
+                const initRotY = (Math.random() - 0.5) * 0.5;
+                const initRotZ = (Math.random() - 0.5) * 0.2;
+
+                // 2. Target State: Fibonacci Sphere
+                const y = 1 - (i / (CONFIG.imageCount - 1)) * 2;
+                const radius = Math.sqrt(1 - y * y);
+                const theta = phi * i;
+                
+                const targetX = Math.cos(theta) * radius * CONFIG.sphereRadius;
+                const targetY = y * CONFIG.sphereRadius;
+                const targetZ = Math.sin(theta) * radius * CONFIG.sphereRadius;
+
+                // Calculate target rotation (face outward from center)
+                const dummyObj = new THREE.Object3D();
+                dummyObj.position.set(targetX, targetY, targetZ);
+                dummyObj.lookAt(0, 0, 0); // Look at center
+                // We want them to look OUTWARD, so rotate 180 on Y
+                dummyObj.rotation.y += Math.PI; 
+                
+                const targetQuaternion = dummyObj.quaternion.clone();
+                const initialQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(initRotX, initRotY, initRotZ));
+
+                // Store data for animation
+                mesh.userData = {
+                    id: i + 1,
+                    initialPos: new THREE.Vector3(initX, initY, initZ),
+                    targetPos: new THREE.Vector3(targetX, targetY, targetZ),
+                    initialQuat: initialQuaternion,
+                    targetQuat: targetQuaternion,
+                    title: `PROJECT ${String(i + 1).padStart(2, '0')}`,
+                    category: ['WEB DESIGN', 'ART DIRECTION', '3D MOTION', 'BRANDING'][Math.floor(Math.random() * 4)],
+                    year: '2026'
+                };
+
+                // Set initial transform
+                mesh.position.copy(mesh.userData.initialPos);
+                mesh.quaternion.copy(mesh.userData.initialQuat);
+
+                // Add slight random scale variation for organic feel
+                const baseScale = 0.8 + Math.random() * 0.4;
+                mesh.scale.set(baseScale, baseScale, baseScale);
+                mesh.userData.baseScale = baseScale;
+
+                imageGroup.add(mesh);
+                meshes.push(mesh);
+            }
+        }
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 1. Smooth Scroll Progress
+            targetScrollProgress = Math.min(window.scrollY / (document.body.scrollHeight - window.innerHeight), 1);
+            scrollProgress += (targetScrollProgress - scrollProgress) * CONFIG.scrollLerp;
+
+            // 2. Update Each Image
+            for (let i = 0; i < meshes.length; i++) {
+                const mesh = meshes[i];
+                const data = mesh.userData;
+
+                // Interpolate Position
+                const currentPos = new THREE.Vector3().lerpVectors(data.initialPos, data.targetPos, scrollProgress);
+                mesh.position.copy(currentPos);
+
+                // Interpolate Rotation (Spherical Linear Interpolation)
+                mesh.quaternion.slerpQuaternions(data.initialQuat, data.targetQuat, scrollProgress);
+
+                // Hover Effect Override (if this is the hovered mesh)
+                if (hoveredMesh === mesh) {
+                    const targetScale = data.baseScale * 1.2;
+                    mesh.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+                    // Push slightly forward relative to camera for pop effect
+                    // (Simplified: just scale is usually enough and more performant)
+                } else {
+                    mesh.scale.lerp(new THREE.Vector3(data.baseScale, data.baseScale, data.baseScale), 0.1);
+                }
+            }
+
+            // 3. Group Rotation (Drag + Inertia)
+            if (!isDragging) {
+                // Apply inertia decay
+                velocity.x *= CONFIG.inertiaDecay;
+                velocity.y *= CONFIG.inertiaDecay;
+                
+                // Add auto-rotation when idle (very subtle)
+                if (Math.abs(velocity.x) < 0.001 && Math.abs(velocity.y) < 0.001 && scrollProgress > 0.8) {
+                    velocity.y += 0.0005;
+                }
+
+                targetRotation.y += velocity.x;
+                targetRotation.x += velocity.y;
+            }
+
+            // Clamp vertical rotation to prevent flipping upside down
+            targetRotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, targetRotation.x));
+
+            // Smoothly interpolate current rotation to target
+            currentRotation.x += (targetRotation.x - currentRotation.x) * CONFIG.rotationLerp;
+            currentRotation.y += (targetRotation.y - currentRotation.y) * CONFIG.rotationLerp;
+
+            imageGroup.rotation.x = currentRotation.x;
+            imageGroup.rotation.y = currentRotation.y;
+
+            // 4. Raycasting for Hover
+            checkIntersection();
+
+            // 5. Render
+            renderer.render(scene, camera);
+        }
+
+        // --- INTERACTION HANDLERS ---
+        function onPointerDown(event) {
+            isDragging = true;
+            isTouch = event.type === 'touchstart';
+            velocity.x = 0;
+            velocity.y = 0;
+            
+            const clientX = isTouch ? event.touches[0].clientX : event.clientX;
+            const clientY = isTouch ? event.touches[0].clientY : event.clientY;
+            
+            previousMousePosition = { x: clientX, y: clientY };
+            
+            // Prevent default only on touch to stop page scrolling while rotating
+            if (isTouch) {
+                // container.style.touchAction = 'none';
+            }
+        }
+
+        function onPointerMove(event) {
+            const clientX = isTouch ? event.touches[0].clientX : event.clientX;
+            const clientY = isTouch ? event.touches[0].clientY : event.clientY;
+
+            // Update pointer for raycaster
+            pointer.x = (clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+
+            if (isDragging) {
+                const deltaX = clientX - previousMousePosition.x;
+                const deltaY = clientY - previousMousePosition.y;
+
+                velocity.x = deltaX * CONFIG.dragSensitivity;
+                velocity.y = deltaY * CONFIG.dragSensitivity;
+
+                previousMousePosition = { x: clientX, y: clientY };
+            }
+        }
+
+        function onPointerUp() {
+            isDragging = false;
+            if (isTouch) {
+                // container.style.touchAction = '';
+            }
+        }
+
+        function onClick(event) {
+            // Only trigger click if we weren't dragging (small movement threshold)
+            if (Math.abs(velocity.x) > 0.01 || Math.abs(velocity.y) > 0.01) return;
+            
+            if (hoveredMesh) {
+                openModal(hoveredMesh.userData);
+            }
+        }
+
+        function onScroll() {
+            // Scroll logic is handled in animate() via window.scrollY
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            
+            // Adjust config for mobile dynamically if needed
+            if (window.innerWidth < 768) {
+                camera.position.z = 28;
+            } else {
+                camera.position.z = 35;
+            }
+        }
+
+        // --- RAYCASTING & HOVER UI ---
+        function checkIntersection() {
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(meshes);
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                
+                if (hoveredMesh !== object) {
+                    hoveredMesh = object;
+                    document.body.style.cursor = 'pointer';
+                    updateTooltip(object.userData);
+                }
+                
+                // Update tooltip position to follow the 3D object
+                updateTooltipPosition(object);
+            } else {
+                if (hoveredMesh) {
+                    hoveredMesh = null;
+                    document.body.style.cursor = 'default';
+                    tooltip.classList.remove('active');
+                }
+            }
+        }
+
+        function updateTooltip(data) {
+            tooltipTitle.textContent = data.title;
+            tooltipCategory.textContent = data.category;
+            tooltipYear.textContent = data.year;
+            tooltip.classList.add('active');
+        }
+
+        function updateTooltipPosition(mesh) {
+            // Get the center of the mesh in world space
+            const vector = new THREE.Vector3();
+            mesh.getWorldPosition(vector);
+            
+            // Push it slightly towards camera to ensure it's in front
+            vector.z += 2; 
+
+            vector.project(camera);
+
+            const x = (vector.x * .5 + .5) * window.innerWidth;
+            const y = (-(vector.y * .5) + .5) * window.innerHeight;
+
+            tooltip.style.left = `${x}px`;
+            tooltip.style.top = `${y}px`;
+        }
+
+        // --- MODAL ---
+        window.openModal = function(data) {
+            modal.classList.add('active');
+            // Pause inertia while modal is open
+            velocity.x = 0;
+            velocity.y = 0;
+        };
+
+        window.closeModal = function() {
+            modal.classList.remove('active');
+        };
+
+        // Close modal on outside click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        // --- START ---
+        // Wait for fonts or just start
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+
+        // Visibility API to pause rendering when tab is hidden (Performance)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Optional: cancelAnimationFrame
+            } else {
+                animate();
+            }
+        });
+
+    </script>
+</body>
+</html>
